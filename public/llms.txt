@@ -1,0 +1,32 @@
+# Hostfluencer
+
+> The marketplace connecting Airbnb and vacation rental hosts with content creators for authentic UGC, brand collabs, and creator stays.
+
+Hostfluencer helps hosts trade off-peak nights for professional photos, videos, and reels with full commercial rights, and lets brands run paid campaigns with vetted creators.
+
+## Pages
+
+- [Home](/): The feed for hospitality collabs — new stays, brand deals, and creator collabs daily.
+- [For Hosts](/for-hosts): How vacation rental and Airbnb hosts get UGC by hosting creators.
+- [For Creators](/for-creators): How creators apply, get matched, and earn from stays and brand deals.
+- [For Brands](/for-brands): How brands launch paid campaigns with vetted hospitality creators.
+- [Marketplace](/marketplace): Browse open creator stays and brand deals.
+- [Pricing](/pricing): Subscription tiers for creators and per-engagement fees for brands and hosts.
+- [Blog](/blog): Tips and guides for hosts and content creators.
+- [About Us](/about-us): Team, mission, and how Hostfluencer works.
+- [Help Center](/help): FAQs and support.
+- [Ambassador Program](/ambassador-program): Earn commissions referring hosts and creators.
+- [Creator Resources](/creator-resources): Templates and guides for creators.
+
+## SEO landing pages
+
+- [UGC for Airbnb Hosts](/ugc-for-airbnb-hosts): Professional Airbnb content without the price tag.
+- [UGC for Vacation Rentals](/ugc-for-vacation-rentals): Vacation rental content and photography.
+- [Influencer Stays for Hosts](/influencer-stays-for-hosts): Turn empty nights into marketing content.
+
+## Optional
+
+- [Privacy Policy](/privacy-policy)
+- [Terms of Service](/terms-of-service)
+- [Content Guidelines](/content-guidelines)
+- [Raffle Rules](/raffle-rules)

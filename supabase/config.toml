@@ -1,0 +1,189 @@
+project_id = "dkahqqmcmwfaxjxmfxne"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+[functions.aardvark-signup-complete]
+verify_jwt = false
+
+[functions.aardvark-notify-signup]
+verify_jwt = true
+
+[functions.calculate-ai-match]
+verify_jwt = true
+
+[functions.bulk-calculate-ai-matches]
+verify_jwt = true
+
+[functions.connect-meta-analytics]
+verify_jwt = false
+
+[functions.sync-meta-analytics]
+verify_jwt = false
+
+[functions.calculate-account-value]
+verify_jwt = true
+
+[functions.generate-content-recommendations]
+verify_jwt = true
+
+[functions.calculate-roi-metrics]
+verify_jwt = true
+
+[functions.generate-media-kit-pdf]
+verify_jwt = true
+
+[functions.generate-ai-recommendations]
+verify_jwt = true
+
+[functions.analyze-content-intelligence]
+verify_jwt = true
+
+
+[functions.support-chatbot]
+verify_jwt = false
+
+[functions.discovery-ai-chat]
+verify_jwt = false
+
+
+[functions.scheduled-analytics-sync]
+verify_jwt = false
+
+[functions.sign-ambassador-contract]
+verify_jwt = true
+
+[functions.admin-get-user-details]
+verify_jwt = true
+
+[functions.admin-manage-user]
+verify_jwt = true
+
+[functions.admin-get-user-stats]
+verify_jwt = true
+
+[functions.admin-list-users]
+verify_jwt = true
+
+[functions.create-connect-account]
+verify_jwt = true
+
+[functions.create-connect-account-link]
+verify_jwt = true
+
+[functions.process-ambassador-payout]
+verify_jwt = true
+
+[functions.get-connect-account-status]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.sync-stripe-data]
+verify_jwt = true
+
+[functions.transfer-property-ownership]
+verify_jwt = false
+
+[functions.transfer-campaign-ownership]
+verify_jwt = false
+
+[functions.sign-collaboration-contract]
+verify_jwt = false
+
+[functions.notify-application-received]
+verify_jwt = false
+
+[functions.send-welcome-email]
+verify_jwt = false
+
+[functions.sync-property-calendar]
+verify_jwt = false
+
+[functions.sitemap]
+verify_jwt = false
+
+[functions.send-campaign-invitation]
+verify_jwt = false
+
+[functions.calculate-platform-metrics]
+verify_jwt = false
+
+[functions.manage-admin-roles]
+verify_jwt = false
+
+[functions.bulk-user-operations]
+verify_jwt = false
+
+[functions.export-users]
+verify_jwt = false
+
+[functions.detect-duplicates]
+verify_jwt = false
+
+[functions.merge-accounts]
+verify_jwt = false
+
+[functions.send-broadcast-email]
+verify_jwt = false
+
+[functions.check-feature-flag]
+verify_jwt = false
+
+[functions.create-subscription]
+verify_jwt = false
+
+[functions.customer-portal]
+verify_jwt = false
+
+[functions.setup-stripe-products]
+verify_jwt = false
+
+[functions.create-waitlist-user]
+verify_jwt = false
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.send-invitation-email]
+verify_jwt = false
+
+[functions.process-collaboration-payment]
+verify_jwt = false
+
+[functions.enforce-rate-limit]
+verify_jwt = false
+
+[functions.check-subscription-status]
+verify_jwt = false
+
+[functions.resync-all-subscriptions]
+verify_jwt = false
+
+[functions.create-campaign-checkout]
+verify_jwt = false
+
+[functions.meta-data-deletion]
+verify_jwt = false
+
+[functions.connect-tiktok-analytics]
+verify_jwt = false
+
+[functions.sync-tiktok-analytics]
+verify_jwt = false
+
+[functions.process-automations]
+verify_jwt = false
+
+# Cross-app: pull hostfluencerX campaign post stats via creator logins.
+# Invoked by a trusted scheduler/admin (writes to hostfluencerX via service key).
+[functions.sync-hfx-campaign-stats]
+verify_jwt = false

@@ -1,0 +1,29 @@
+export interface Property {
+  id: string;
+  host_id: string;
+  title: string;
+  description?: string;
+  location: string;
+  property_type: string;
+  max_guests: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  amenities?: string[];
+  collaboration_type: string;
+  discount_percentage?: number;
+  content_requirements?: string[];
+  is_active?: boolean;
+  created_at: string;
+  updated_at?: string;
+  ical_url?: string;
+  ical_last_synced_at?: string;
+  ical_sync_enabled?: boolean;
+  base_nightly_rate?: number;
+  currency?: string;
+  campaign_rate?: number;
+  platform_fee?: number;
+  creator_payout?: number;
+  payment_status?: string;
+  stripe_checkout_session_id?: string;
+  stripe_payment_intent_id?: string;
+}

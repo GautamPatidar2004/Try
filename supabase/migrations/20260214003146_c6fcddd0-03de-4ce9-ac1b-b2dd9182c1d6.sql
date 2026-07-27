@@ -1,0 +1,1 @@
+UPDATE subscription_plans SET max_applications_per_month = 1, max_pitches_per_month = 1 WHERE id = 'f76116b6-f0e8-4073-be65-2c13061a2384';

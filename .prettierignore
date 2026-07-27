@@ -1,0 +1,7 @@
+dist/
+build/
+node_modules/
+coverage/
+public/
+*.min.js
+src/integrations/supabase/types.ts

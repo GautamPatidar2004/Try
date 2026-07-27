@@ -1,0 +1,1 @@
+ALTER TABLE public.messages DROP CONSTRAINT IF EXISTS messages_application_id_fkey;
