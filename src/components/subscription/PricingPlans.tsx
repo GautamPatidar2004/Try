@@ -561,6 +561,44 @@ export const PricingPlans: React.FC<PricingPlansProps> = ({ forcedCategory, comp
     userTypeCategory,
     fetchSubscriptionPlans
   } = useSubscription();
+
+  const getDbPlan = (staticPlanName: string, staticPlanId: string) => {
+    const nameClean = staticPlanName.trim().toLowerCase();
+    
+    // 1. Try exact matches (trimmed and case-insensitive)
+    let matches = subscriptionPlans.filter(p => p.name.trim().toLowerCase() === nameClean);
+    
+    // 2. If no exact match, apply fallback mappings for un-migrated databases
+    if (matches.length === 0) {
+      matches = subscriptionPlans.filter(p => {
+        const dbName = p.name.trim().toLowerCase();
+        if (nameClean === 'entry' && dbName === 'starter') return true;
+        if (nameClean === 'check-in' && dbName === 'starter') return true;
+        if (nameClean === 'extended stay' && dbName === 'growth') return true;
+        if (nameClean === 'owner' && dbName === 'scale') return true;
+        return false;
+      });
+    }
+
+    if (matches.length === 0) return undefined;
+
+    // 3. Filter by expected user type category
+    const expectedCategory = (staticPlanId.startsWith('brand') || staticPlanId.startsWith('host')) ? 'demand' : 'supply';
+    const categoryMatches = matches.filter(p => p.user_type_category === expectedCategory);
+    
+    const candidates = categoryMatches.length > 0 ? categoryMatches : matches;
+
+    // 4. Uniquely resolve: highest display_order first, then newest created_at first
+    return candidates.sort((a, b) => {
+      const aOrder = a.display_order || 0;
+      const bOrder = b.display_order || 0;
+      if (aOrder !== bOrder) return bOrder - aOrder;
+
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    })[0];
+  };
   
   const [billingInterval, setBillingInterval] = React.useState<'monthly' | 'yearly'>('monthly');
   const [hasAutoTriggered, setHasAutoTriggered] = React.useState(false);
@@ -787,7 +825,7 @@ export const PricingPlans: React.FC<PricingPlansProps> = ({ forcedCategory, comp
             }
           `}>
             {brandPlansStatic.map((plan, index) => {
-              const dbPlan = subscriptionPlans.find(p => p.name.toLowerCase() === plan.name.toLowerCase());
+              const dbPlan = getDbPlan(plan.name, plan.id);
               return (
                 <div 
                   key={plan.id} 
@@ -822,7 +860,7 @@ export const PricingPlans: React.FC<PricingPlansProps> = ({ forcedCategory, comp
             }
           `}>
             {hostPlansStatic.map((plan, index) => {
-              const dbPlan = subscriptionPlans.find(p => p.name.toLowerCase() === plan.name.toLowerCase());
+              const dbPlan = getDbPlan(plan.name, plan.id);
               return (
                 <div 
                   key={plan.id} 

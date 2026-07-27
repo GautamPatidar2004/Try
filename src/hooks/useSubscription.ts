@@ -26,6 +26,8 @@ export interface SubscriptionPlan {
   has_advanced_analytics: boolean;
   team_seats: number;
   marketplace_boosts_per_month: number;
+  display_order: number;
+  created_at?: string;
 }
 
 export interface SubscriptionStatus {
@@ -152,7 +154,9 @@ export const useSubscription = () => {
         has_media_kit: plan.has_media_kit || false,
         has_advanced_analytics: plan.has_advanced_analytics || false,
         team_seats: plan.team_seats || 1,
-        marketplace_boosts_per_month: plan.marketplace_boosts_per_month || 0
+        marketplace_boosts_per_month: plan.marketplace_boosts_per_month || 0,
+        display_order: plan.display_order || 0,
+        created_at: plan.created_at
       }));
       
       setSubscriptionPlans(plans);
