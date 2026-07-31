@@ -32,6 +32,7 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
+    // 1. Authenticate User
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header provided");
@@ -39,19 +40,20 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    
+    if (userError || !userData?.user) {
+      throw new Error(`Authentication error: ${userError?.message || 'User not authenticated'}`);
+    }
+
     const user = userData.user;
     if (!user?.email) {
       throw new Error("User not authenticated or email not available");
     }
     logStep("User authenticated", { userId: user.id });
 
-    // Parse and validate request body
+    // 2. Parse & Validate Payload
     const body = await req.json();
     const { planId, billingInterval = 'monthly', returnUrl } = body;
-    
-    // Validate inputs
+
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!planId || !uuidRegex.test(planId)) {
       return new Response(JSON.stringify({ error: "Invalid plan ID format" }), {
@@ -59,55 +61,50 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    
+
     if (!['monthly', 'yearly'].includes(billingInterval)) {
       return new Response(JSON.stringify({ error: "Invalid billing interval. Must be 'monthly' or 'yearly'" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    
+
     logStep("Request validated", { planId, billingInterval });
 
-    // Get subscription plan details
+    // 3. FETCH PLAN FIRST (Crucial Fix: Pehle Database se plan lana zaroori hai)
     const { data: plan, error: planError } = await supabaseClient
       .from('subscription_plans')
       .select('*')
       .eq('id', planId)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (planError || !plan) {
-      throw new Error("Invalid or inactive subscription plan");
+      throw new Error(`Invalid or inactive subscription plan: ${planError?.message || 'Plan not found'}`);
     }
-    logStep("Plan found", { 
-      planName: plan.name, 
+
+    logStep("Plan found", {
+      planName: plan.name,
       price: billingInterval === 'yearly' ? plan.price_yearly : plan.price_monthly,
       userTypeCategory: plan.user_type_category
     });
 
-    // Get user profile to determine user type
+    // 4. Fetch User Profile
     const { data: profile } = await supabaseClient
       .from('profiles')
       .select('user_type')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    const userType = profile?.user_type;
+    const userType = profile?.user_type || null;
     logStep("User type determined", { userType });
 
-    // Validate user type matches plan category
+    // 5. COMPARE CATEGORIES (Plan fetch hone ke BAAD hi chalega)
     const getPlanCategory = (planName: string, planDbCategory: string): 'creator' | 'demand' | 'supply' => {
       const nameLower = planName.toLowerCase();
-      if (nameLower.includes('creator')) {
-        return 'creator';
-      }
-      if (['entry', 'growth', 'scale'].includes(nameLower)) {
-        return 'demand';
-      }
-      if (['check-in', 'extended stay', 'owner'].includes(nameLower)) {
-        return 'supply';
-      }
+      if (nameLower.includes('creator')) return 'creator';
+      if (['entry', 'growth', 'scale'].includes(nameLower)) return 'demand';
+      if (['check-in', 'extended stay', 'owner'].includes(nameLower)) return 'supply';
       return planDbCategory === 'supply' ? 'creator' : 'demand';
     };
 
@@ -115,40 +112,35 @@ serve(async (req) => {
       if (!type) return 'demand';
       if (type === 'influencer') return 'creator';
       if (type === 'host') return 'supply';
-      return 'demand'; // brand, restaurant_owner
+      return 'demand';
     };
 
     const userCategory = getUserCategory(userType);
     const planCategory = getPlanCategory(plan.name, plan.user_type_category);
 
     if (userCategory !== planCategory) {
-      return new Response(JSON.stringify({ 
-        error: `This plan is for ${planCategory === 'demand' ? 'brands' : planCategory === 'supply' ? 'hosts' : 'creators'}. Please choose a plan that matches your account type.` 
+      logStep("Category mismatch", { userCategory, planCategory });
+      return new Response(JSON.stringify({
+        error: `This plan is for ${planCategory === 'demand' ? 'brands' : planCategory === 'supply' ? 'hosts' : 'creators'}. Please choose a plan that matches your account type.`
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Handle free Starter plans - no Stripe checkout needed
-    if (plan.price_monthly === 0) {
+    // 6. Handle Free Plans
+    const rawPrice = billingInterval === 'yearly' ? plan.price_yearly : plan.price_monthly;
+    if (rawPrice === 0) {
       logStep("Free plan detected, creating direct subscription");
-      
-      // Determine the correct user ID field based on user type
+
       const subscriptionData: any = {
         plan_id: plan.id,
         status: 'active',
-        billing_interval: 'monthly',
+        billing_interval: billingInterval,
         current_period_start: new Date().toISOString(),
-        current_period_end: null, // Free plan never expires
+        current_period_end: null,
+        influencer_id: user.id,
       };
-
-      // Use influencer_id for supply-side, or create appropriate linking
-      if (userCategory === 'supply') {
-        subscriptionData.influencer_id = user.id;
-      } else {
-        subscriptionData.influencer_id = user.id; // For now, use same field
-      }
 
       const { error: subError } = await supabaseClient
         .from('subscriptions')
@@ -159,8 +151,7 @@ serve(async (req) => {
       }
 
       logStep("Free subscription created successfully");
-
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         message: 'Free subscription activated',
         planName: plan.name,
         isFree: true
@@ -170,7 +161,7 @@ serve(async (req) => {
       });
     }
 
-    // Check for existing active subscription
+    // 7. Check Existing Active Subscriptions
     const { data: existingSub } = await supabaseClient
       .from('subscriptions')
       .select('*, subscription_plans(*)')
@@ -178,43 +169,29 @@ serve(async (req) => {
       .eq('status', 'active')
       .maybeSingle();
 
-    // Only block if user has an active PAID subscription
     if (existingSub) {
       const existingPlan = existingSub.subscription_plans;
       const isFreePlan = existingPlan?.price_monthly === 0;
-      
+
       if (!isFreePlan) {
-        // User has an active paid subscription - use customer portal to upgrade
         throw new Error("You already have an active subscription. Please use the customer portal to manage your subscription.");
       }
-      
-      // User is on a free plan - mark it as canceled when they upgrade
-      logStep("User upgrading from free plan", { 
-        existingPlanName: existingPlan?.name 
-      });
-      
-      // Cancel the free subscription since they're upgrading
+
+      logStep("User upgrading from free plan");
       await supabaseClient
         .from('subscriptions')
-        .update({ 
+        .update({
           status: 'canceled',
           canceled_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', existingSub.id);
-        
-      logStep("Free subscription canceled for upgrade");
     }
 
+    // 8. Stripe Customer Setup
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-
-    // ---- Resolve or create Stripe customer ----
-    // Priority: profiles.stripe_customer_id → subscriptions.stripe_customer_id
-    //           → Stripe email search → create new
-    // This preserves existing Stripe Customer records across all flows.
     let customerId: string;
 
-    // 1. Profile cache (written back by webhook and portal)
     const { data: profileForCustomer } = await supabaseClient
       .from('profiles')
       .select('stripe_customer_id')
@@ -225,62 +202,34 @@ serve(async (req) => {
       customerId = profileForCustomer.stripe_customer_id;
       logStep("Existing customer from profile cache", { customerId });
     } else {
-      // 2. Subscriptions table
-      const { data: subWithCustomer } = await supabaseClient
-        .from('subscriptions')
-        .select('stripe_customer_id')
-        .eq('influencer_id', user.id)
-        .not('stripe_customer_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (subWithCustomer?.stripe_customer_id) {
-        customerId = subWithCustomer.stripe_customer_id;
-        logStep("Existing customer from subscriptions table", { customerId });
-        // Back-fill profile cache
-        await supabaseClient
-          .from('profiles')
-          .update({ stripe_customer_id: customerId })
-          .eq('id', user.id);
+      const customers = await stripe.customers.list({ email: user.email, limit: 5 });
+      if (customers.data.length > 0) {
+        const byMeta = customers.data.find((c) => c.metadata?.user_id === user.id);
+        const chosen = byMeta || customers.data[0];
+        customerId = chosen.id;
+        logStep("Existing Stripe customer found by email", { customerId });
       } else {
-        // 3. Stripe email search
-        const customers = await stripe.customers.list({ email: user.email, limit: 5 });
-        if (customers.data.length > 0) {
-          // Prefer customer whose metadata.user_id matches
-          const byMeta = customers.data.find((c) => c.metadata?.user_id === user.id);
-          const chosen = byMeta || customers.data[0];
-          customerId = chosen.id;
-          logStep("Existing Stripe customer found by email", { customerId });
-          await supabaseClient
-            .from('profiles')
-            .update({ stripe_customer_id: customerId })
-            .eq('id', user.id);
-        } else {
-          // 4. Create new customer
-          const customer = await stripe.customers.create({
-            email: user.email,
-            metadata: { user_id: user.id, user_type: userType || 'unknown' }
-          });
-          customerId = customer.id;
-          logStep("New Stripe customer created", { customerId });
-          await supabaseClient
-            .from('profiles')
-            .update({ stripe_customer_id: customerId })
-            .eq('id', user.id);
-        }
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { user_id: user.id, user_type: userType || 'unknown' }
+        });
+        customerId = customer.id;
+        logStep("New Stripe customer created", { customerId });
       }
+
+      await supabaseClient
+        .from('profiles')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', user.id);
     }
 
-    // Create subscription session with potential trial
-    const price = billingInterval === 'yearly' ? plan.price_yearly : plan.price_monthly;
+    // 9. Create Stripe Session
     const stripePrice = billingInterval === 'yearly' ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly;
-    
-    // Build success/cancel URLs that ALWAYS include status + session_id signals
-    const origin = req.headers.get("origin");
+    const origin = req.headers.get("origin") || "http://localhost:3000";
+
     const buildUrl = (path: string, params: Record<string, string>) => {
-      const base = `${origin}${path}`;
-      const sep = path.includes('?') ? '&' : '?';
+      const base = path.startsWith("http") ? path : `${origin}${path}`;
+      const sep = base.includes('?') ? '&' : '?';
       const query = Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&');
       return `${base}${sep}${query}`;
     };
@@ -288,13 +237,13 @@ serve(async (req) => {
     const successUrl = returnUrl
       ? buildUrl(returnUrl, { session_id: '{CHECKOUT_SESSION_ID}', status: 'success' })
       : `${origin}/subscription-success?session_id={CHECKOUT_SESSION_ID}&status=success`;
+
     const cancelUrl = returnUrl
       ? buildUrl(returnUrl, { status: 'canceled' })
       : `${origin}/pricing?status=canceled`;
 
     const sessionConfig: any = {
       customer: customerId,
-      customer_email: customerId ? undefined : user.email,
       mode: "subscription",
       success_url: successUrl,
       cancel_url: cancelUrl,
@@ -308,10 +257,7 @@ serve(async (req) => {
       allow_promotion_codes: true,
     };
 
-    // No trial period - charge immediately since we have a free tier
-
     if (stripePrice) {
-      // Use existing Stripe price
       sessionConfig.line_items = [
         {
           price: stripePrice,
@@ -319,16 +265,18 @@ serve(async (req) => {
         },
       ];
     } else {
-      // Create subscription with inline price
+      // Fix: Inline price in cents
+      const unitAmountInCents = Math.round(rawPrice * 100);
+
       sessionConfig.line_items = [
         {
           price_data: {
             currency: "usd",
             product_data: {
               name: `${plan.name} Plan`,
-              description: plan.description,
+              description: plan.description || undefined,
             },
-            unit_amount: price,
+            unit_amount: unitAmountInCents,
             recurring: {
               interval: billingInterval === 'yearly' ? 'year' : 'month',
             },
@@ -339,7 +287,6 @@ serve(async (req) => {
     }
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
-
     logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
     return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
@@ -348,8 +295,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
+
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in create-subscription", { message: errorMessage });
+
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
